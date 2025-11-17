@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Barcode Buchscanner</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        #scanner-container { width: 400px; margin: auto; }
+        #barcode-result, #book-info {
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+        #book-info {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-top: 25px;
+            display: inline-block;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<h2>📖 Barcode-Buchscanner</h2>
+
+<div id="scanner-container">
+    <div id="interactive" class="viewport"></div>
+</div>
+
+<div id="barcode-result">Noch kein Barcode erkannt…</div>
+<div id="book-info"></div>
+
+<!-- QuaggaJS -->
+<script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
+
+<script>
+
+    let scanned = false; // nur einmal scannen, bis man selbst zurücksetzt
+
+    // Scanner starten
+    Quagga.init({
+        inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: document.querySelector('#interactive'),
+            constraints: { facingMode: "environment" },
+            attributes: {
+                mirror: false // ✔️ Kamera nicht spiegeln
+            }
+        },
+        decoder: {
+            readers: [
+                "ean_reader",
+                "ean_13_reader",
+                "upc_reader",
+                "code_128_reader",   // ✔️ Schulbuchcodes
+                "code_39_reader",    // ✔️ Bibliothekscodes
+                "code_39_vin_reader",
+                "codabar_reader"     // ✔️ weitere Schulcodes
+            ]
+        }
+    }, err => {
+        if (err) { console.error(err); return; }
+        Quagga.start();
+    });
+
+    // Barcode wurde erkannt
+    Quagga.onDetected(result => {
+        if (scanned) return;  // nur 1 Scan auslösen
+        scanned = true;
+
+        const code = result.codeResult.code;
+
+        document.getElementById("barcode-result").innerText =
+            "📦 Barcode erkannt: " + code;
+
+        fetchBookInfo(code);
+    });
+
+    // Google Books API → Schulbücher funktionieren jetzt
+    function fetchBookInfo(code) {
+
+        // NICHT NUR ISBN → Schulbücher werden gefunden!
+        fetch(`https://www.googleapis.com/books/v1/volumes?q=${code}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!data.items) {
+                    document.getElementById("book-info").innerHTML =
+                        "<b>❌ Kein Eintrag gefunden (evtl. Schulbuch ohne Google-Eintrag).</b>";
+                    return;
+                }
+
+                const info = data.items[0].volumeInfo;
+
+                const title = info.title || "Unbekannt";
+                const authors = info.authors ? info.authors.join(", ") : "Unbekannt";
+                const year = info.publishedDate ? info.publishedDate.substring(0, 4) : "Unbekannt";
+
+                document.getElementById("book-info").innerHTML = `
+                    <h3>📚 Buchdaten</h3>
+                    <p><b>Titel:</b> ${title}</p>
+                    <p><b>Autor(en):</b> ${authors}</p>
+                    <p><b>Erscheinungsjahr:</b> ${year}</p>
+                `;
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById("book-info").innerHTML =
+                    "<b>Fehler beim Laden der Buchdaten.</b>";
+            });
+    }
+
+</script>
+
+</body>
+</html>
