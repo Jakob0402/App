@@ -35,28 +35,39 @@
 
 <script>
 
-    let scanned = false; // nur einmal scannen, bis man selbst zurücksetzt
+    let scanned = false;
 
-    // Scanner starten
+    // Scanner mit Autofokus starten
     Quagga.init({
         inputStream: {
             name: "Live",
             type: "LiveStream",
             target: document.querySelector('#interactive'),
-            constraints: { facingMode: "environment" },
+
+            // 🔥 Autofokus aktivieren
+            constraints: {
+                facingMode: "environment",
+                focusMode: "continuous",
+                advanced: [
+                    { focusMode: "continuous" }
+                ]
+            },
+
             attributes: {
-                mirror: false // ✔️ Kamera nicht spiegeln
+                mirror: false   // 🔥 Kamera NICHT spiegeln
             }
         },
+
+        // 🔥 Alle relevanten Schulbuch-Barcodetypen
         decoder: {
             readers: [
                 "ean_reader",
                 "ean_13_reader",
                 "upc_reader",
-                "code_128_reader",   // ✔️ Schulbuchcodes
-                "code_39_reader",    // ✔️ Bibliothekscodes
+                "code_128_reader",   // Schulbuchcodes
+                "code_39_reader",    // Bibliothekscodes
                 "code_39_vin_reader",
-                "codabar_reader"     // ✔️ weitere Schulcodes
+                "codabar_reader"
             ]
         }
     }, err => {
@@ -66,7 +77,7 @@
 
     // Barcode wurde erkannt
     Quagga.onDetected(result => {
-        if (scanned) return;  // nur 1 Scan auslösen
+        if (scanned) return;
         scanned = true;
 
         const code = result.codeResult.code;
@@ -77,10 +88,10 @@
         fetchBookInfo(code);
     });
 
-    // Google Books API → Schulbücher funktionieren jetzt
+    // Google Books API → sucht auch Schulbücher
     function fetchBookInfo(code) {
 
-        // NICHT NUR ISBN → Schulbücher werden gefunden!
+        // 🔥 NICHT NUR ISBN suchen, damit Schulbücher gefunden werden
         fetch(`https://www.googleapis.com/books/v1/volumes?q=${code}`)
             .then(res => res.json())
             .then(data => {
