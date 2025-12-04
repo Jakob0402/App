@@ -2,49 +2,62 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<meta charset="UTF-8">
 <title>Barcode Scanner</title>
 <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
+<style>
+body { font-family: Arial; text-align: center; padding: 20px; }
+#countdown { font-size: 24px; margin-top: 20px; color: #007bff; }
+</style>
 </head>
 <body>
 
 <h2>🔍 Barcode wird analysiert…</h2>
+<div id="countdown">Geschätzte Restzeit: Berechnung...</div>
 
 <script>
-// Bild aus LocalStorage holen
+// Bild aus LocalStorage
 const imgData = localStorage.getItem("scanImage");
-
 if (!imgData) {
     document.body.innerHTML = "<p>❌ Kein Foto gefunden.</p>";
 }
 
-// Barcode auslesen
+// Countdown-Element
+const countdownEl = document.getElementById("countdown");
+
+// Dynamische Schätzung
+let startTime = Date.now();
+let framesProcessed = 0;
+let barcodeDetected = false;
+
+// Quagga initialisieren
 Quagga.decodeSingle({
     decoder: { readers: ["ean_reader", "ean_13_reader"] },
     src: imgData
 }, function(result) {
+    barcodeDetected = true;
 
     if (!result || !result.codeResult) {
-        document.body.innerHTML = "<p>❌ Barcode konnte nicht erkannt werden.</p>";
+        countdownEl.textContent = "❌ Barcode nicht erkannt!";
         return;
     }
 
     const isbn = result.codeResult.code;
+    countdownEl.textContent = "✅ Barcode erkannt: " + isbn;
 
-    // Bei isbn.de abrufen (über Netlify, wegen CORS)
+    // ISBN an Netlify Function senden
     fetch(`/.netlify/functions/fetchisbn?code=${isbn}`)
         .then(res => res.text())
         .then(html => {
-
             const doc = new DOMParser().parseFromString(html, "text/html");
 
             const title = doc.querySelector("h1")?.innerText || "Unbekannt";
             const author = doc.querySelector(".author")?.innerText || "Unbekannt";
-
             const year = [...doc.querySelectorAll("li")]
                 .find(li => li.innerText.includes("Erscheinungsjahr"))
                 ?.innerText.replace("Erscheinungsjahr:", "").trim() || "Unbekannt";
 
-            // zurück an index.html
+            // Zurück zu index.html
             window.location.href =
                 `index.html?title=${encodeURIComponent(title)}` +
                 `&author=${encodeURIComponent(author)}` +
@@ -52,6 +65,22 @@ Quagga.decodeSingle({
                 `&isbn=${isbn}`;
         });
 });
+
+// Simuliere Frame-Verarbeitung, um dynamische Restzeit anzuzeigen
+const countdownInterval = setInterval(() => {
+    if (barcodeDetected) {
+        clearInterval(countdownInterval);
+        return;
+    }
+
+    framesProcessed++;
+    const elapsed = (Date.now() - startTime) / 1000; // Sekunden
+    // Annahme: durchschnittlich 15 Frames nötig → restliche Frames schätzen
+    const avgTimePerFrame = elapsed / framesProcessed;
+    const estimatedRemaining = Math.max(0, Math.round(avgTimePerFrame * (15 - framesProcessed)));
+
+    countdownEl.textContent = `Geschätzte Restzeit: ${estimatedRemaining}s`;
+}, 1000);
 </script>
 
 </body>
