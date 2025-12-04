@@ -6,42 +6,45 @@
 <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
 </head>
 <body>
+
 <h2>🔍 Barcode wird analysiert…</h2>
 
 <script>
-const params = new URLSearchParams(window.location.search);
-const imgData = params.get("img");
+// Bild aus LocalStorage holen
+const imgData = localStorage.getItem("scanImage");
 
 if (!imgData) {
-    document.body.innerHTML = "<p>❌ Kein Bild gefunden.</p>";
+    document.body.innerHTML = "<p>❌ Kein Foto gefunden.</p>";
 }
 
+// Barcode auslesen
 Quagga.decodeSingle({
     decoder: { readers: ["ean_reader", "ean_13_reader"] },
     src: imgData
 }, function(result) {
+
     if (!result || !result.codeResult) {
-        document.body.innerHTML = "<p>❌ Kein Barcode gefunden.</p>";
+        document.body.innerHTML = "<p>❌ Barcode konnte nicht erkannt werden.</p>";
         return;
     }
 
     const isbn = result.codeResult.code;
 
-    // ISBN an Netlify Function schicken
+    // Bei isbn.de abrufen (über Netlify, wegen CORS)
     fetch(`/.netlify/functions/fetchisbn?code=${isbn}`)
         .then(res => res.text())
         .then(html => {
+
             const doc = new DOMParser().parseFromString(html, "text/html");
 
             const title = doc.querySelector("h1")?.innerText || "Unbekannt";
             const author = doc.querySelector(".author")?.innerText || "Unbekannt";
 
-            const year = [...doc.querySelectorAll(".book-details li")]
+            const year = [...doc.querySelectorAll("li")]
                 .find(li => li.innerText.includes("Erscheinungsjahr"))
-                ?.innerText.replace("Erscheinungsjahr:", "")
-                .trim() || "Unbekannt";
+                ?.innerText.replace("Erscheinungsjahr:", "").trim() || "Unbekannt";
 
-            // Zurück zu index.html
+            // zurück an index.html
             window.location.href =
                 `index.html?title=${encodeURIComponent(title)}` +
                 `&author=${encodeURIComponent(author)}` +
