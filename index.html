@@ -3,11 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <title>Foto → Barcode → ISBN</title>
+
 <style>
 body { font-family: Arial; text-align: center; padding: 20px; }
-video, img { width: 90%; max-width: 400px; margin-top: 10px; }
-button { padding: 12px 20px; font-size: 18px; margin-top: 15px; }
-#book-info { margin-top: 25px; border: 1px solid #ccc; padding: 15px; }
+video { width: 90%; max-width: 400px; border-radius: 10px; }
+button {
+    margin-top: 20px;
+    padding: 15px 25px;
+    font-size: 18px;
+}
+#book-info {
+    margin-top: 25px;
+    border: 1px solid #ccc;
+    padding: 15px;
+}
 </style>
 </head>
 <body>
@@ -22,35 +31,38 @@ button { padding: 12px 20px; font-size: 18px; margin-top: 15px; }
 <div id="book-info"></div>
 
 <script>
-/* Buchdaten empfangen */
-const params = new URLSearchParams(window.location.search);
-if (params.get("title")) {
-    document.getElementById("book-info").innerHTML = `
-        <h3>📚 Buchdaten</h3>
-        <p><b>Titel:</b> ${params.get("title")}</p>
-        <p><b>Autor:</b> ${params.get("author")}</p>
-        <p><b>Erscheinungsjahr:</b> ${params.get("year")}</p>
-        <p><b>ISBN:</b> ${params.get("isbn")}</p>
-    `;
-}
-
-/* Kamera starten */
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+// Kamera starten
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }})
     .then(stream => video.srcObject = stream);
 
-/* Foto aufnehmen */
+// Foto erstellen
 document.getElementById("captureBtn").addEventListener("click", () => {
     const canvas = document.getElementById("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
+
     const ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0);
 
-    const imageData = canvas.toDataURL("image/png");
+    // Bild wird gespeichert statt in URL → KEIN 414 Fehler
+    const imgData = canvas.toDataURL("image/png");
+    localStorage.setItem("scanImage", imgData);
 
-    window.location.href = "scanner.html?img=" + encodeURIComponent(imageData);
+    // Weiter zur Scannerseite
+    window.location.href = "scanner.html";
 });
-</script>
 
+// Buchdaten anzeigen wenn zurückgekommen
+const params = new URLSearchParams(window.location.search);
+if (params.get("title")) {
+    document.getElementById("book-info").innerHTML = `
+        <h3>📚 Gefundenes Buch</h3>
+        <p><b>Titel:</b> ${params.get("title")}</p>
+        <p><b>Autor:</b> ${params.get("author")}</p>
+        <p><b>Jahr:</b> ${params.get("year")}</p>
+        <p><b>ISBN:</b> ${params.get("isbn")}</p>
+    `;
+}
+</script>
 </body>
 </html>
