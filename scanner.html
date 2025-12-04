@@ -1,16 +1,55 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <title>Barcode Scanner mit Bild-Upload</title>
+<meta charset="UTF-8">
+<title>Barcode Scanner</title>
+<script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
 </head>
 <body>
-    <h1>Barcode aus Bild scannen</h1>
-    <input type="file" id="barcode-image-upload" accept="image/*">
-    <p>Ergebnis: <span id="barcode-result">Kein Barcode erkannt</span></p>
+<h2>🔍 Barcode wird analysiert…</h2>
 
-    <!-- Hier wird die JavaScript-Bibliothek eingebunden, z.B. jsQR über CDN -->
-    <script src="cdn.jsdelivr.net"></script>
-    <script src="ihr_script.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const imgData = params.get("img");
+
+if (!imgData) {
+    document.body.innerHTML = "<p>❌ Kein Bild gefunden.</p>";
+}
+
+Quagga.decodeSingle({
+    decoder: { readers: ["ean_reader", "ean_13_reader"] },
+    src: imgData
+}, function(result) {
+    if (!result || !result.codeResult) {
+        document.body.innerHTML = "<p>❌ Kein Barcode gefunden.</p>";
+        return;
+    }
+
+    const isbn = result.codeResult.code;
+
+    // ISBN an Netlify Function schicken
+    fetch(`/.netlify/functions/fetchisbn?code=${isbn}`)
+        .then(res => res.text())
+        .then(html => {
+            const doc = new DOMParser().parseFromString(html, "text/html");
+
+            const title = doc.querySelector("h1")?.innerText || "Unbekannt";
+            const author = doc.querySelector(".author")?.innerText || "Unbekannt";
+
+            const year = [...doc.querySelectorAll(".book-details li")]
+                .find(li => li.innerText.includes("Erscheinungsjahr"))
+                ?.innerText.replace("Erscheinungsjahr:", "")
+                .trim() || "Unbekannt";
+
+            // Zurück zu index.html
+            window.location.href =
+                `index.html?title=${encodeURIComponent(title)}` +
+                `&author=${encodeURIComponent(author)}` +
+                `&year=${encodeURIComponent(year)}` +
+                `&isbn=${isbn}`;
+        });
+});
+</script>
+
 </body>
 </html>
