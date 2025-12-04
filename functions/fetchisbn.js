@@ -2,7 +2,8 @@ import fetch from "node-fetch";
 
 export async function handler(event, context) {
     const code = event.queryStringParameters.code;
-    if (!code) return { statusCode: 400, body: "Missing ISBN" };
+    if (!code)
+        return { statusCode: 400, body: "Fehlende ISBN" };
 
     const url = `https://www.isbn.de/buch/${code}`;
 
@@ -12,11 +13,16 @@ export async function handler(event, context) {
 
         return {
             statusCode: 200,
-            headers: { "Access-Control-Allow-Origin": "*" },
+            headers: {
+                "Access-Control-Allow-Origin": "*"
+            },
             body: html
         };
 
-    } catch (e) {
-        return { statusCode: 500, body: "Error: " + e.message };
+    } catch (err) {
+        return {
+            statusCode: 500,
+            body: "Fehler: " + err.message
+        };
     }
 }
