@@ -2,18 +2,19 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta charset="UTF-8">
 <title>Barcode Scanner</title>
 <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
 <style>
 body { font-family: Arial; text-align: center; padding: 20px; }
-#countdown { font-size: 24px; margin-top: 20px; color: #007bff; }
+#countdown { font-size: 24px; margin-top: 10px; color: #007bff; }
+#step { font-size: 18px; margin-top: 5px; color: #555; }
 </style>
 </head>
 <body>
 
 <h2>🔍 Barcode wird analysiert…</h2>
 <div id="countdown">Geschätzte Restzeit: Berechnung...</div>
+<div id="step">Schritt: Initialisierung</div>
 
 <script>
 // Bild aus LocalStorage
@@ -22,30 +23,61 @@ if (!imgData) {
     document.body.innerHTML = "<p>❌ Kein Foto gefunden.</p>";
 }
 
-// Countdown-Element
+// DOM Elemente
 const countdownEl = document.getElementById("countdown");
+const stepEl = document.getElementById("step");
 
-// Dynamische Schätzung
-let startTime = Date.now();
-let framesProcessed = 0;
+// Countdown & Status
+let countdownSec = 15; // maximale Wartezeit
 let barcodeDetected = false;
+let resultShown = false;
 
-// Quagga initialisieren
+// Interval zur Aktualisierung
+const interval = setInterval(() => {
+    if (resultShown) {
+        clearInterval(interval);
+        return;
+    }
+
+    countdownEl.textContent = `Geschätzte Restzeit: ${countdownSec}s`;
+
+    countdownSec--;
+
+    // Countdown = 0 → Zeige Ergebnis oder Fehler
+    if (countdownSec < 0) {
+        clearInterval(interval);
+        stepEl.textContent = "⏱ Zeit abgelaufen";
+        if (!barcodeDetected) {
+            countdownEl.textContent = "❌ Barcode konnte nicht erkannt werden.";
+            resultShown = true;
+        }
+    }
+}, 1000);
+
+// Schrittanzeige
+function updateStep(text) {
+    stepEl.textContent = "Schritt: " + text;
+}
+
+// Barcode erkennen
+updateStep("Barcode wird erkannt...");
 Quagga.decodeSingle({
     decoder: { readers: ["ean_reader", "ean_13_reader"] },
     src: imgData
 }, function(result) {
     barcodeDetected = true;
+    updateStep("Barcode erkannt, Buchdaten abrufen...");
 
     if (!result || !result.codeResult) {
         countdownEl.textContent = "❌ Barcode nicht erkannt!";
+        resultShown = true;
         return;
     }
 
     const isbn = result.codeResult.code;
     countdownEl.textContent = "✅ Barcode erkannt: " + isbn;
 
-    // ISBN an Netlify Function senden
+    // ISBN.de abfragen
     fetch(`/.netlify/functions/fetchisbn?code=${isbn}`)
         .then(res => res.text())
         .then(html => {
@@ -57,30 +89,22 @@ Quagga.decodeSingle({
                 .find(li => li.innerText.includes("Erscheinungsjahr"))
                 ?.innerText.replace("Erscheinungsjahr:", "").trim() || "Unbekannt";
 
-            // Zurück zu index.html
+            // Ergebnis anzeigen → zurück zu index.html
+            updateStep("Buchdaten abgerufen, Weiterleitung...");
+            resultShown = true;
+
             window.location.href =
                 `index.html?title=${encodeURIComponent(title)}` +
                 `&author=${encodeURIComponent(author)}` +
                 `&year=${encodeURIComponent(year)}` +
                 `&isbn=${isbn}`;
+        })
+        .catch(err => {
+            countdownEl.textContent = "❌ Fehler beim Abrufen der Buchdaten.";
+            updateStep("Fehler");
+            resultShown = true;
         });
 });
-
-// Simuliere Frame-Verarbeitung, um dynamische Restzeit anzuzeigen
-const countdownInterval = setInterval(() => {
-    if (barcodeDetected) {
-        clearInterval(countdownInterval);
-        return;
-    }
-
-    framesProcessed++;
-    const elapsed = (Date.now() - startTime) / 1000; // Sekunden
-    // Annahme: durchschnittlich 15 Frames nötig → restliche Frames schätzen
-    const avgTimePerFrame = elapsed / framesProcessed;
-    const estimatedRemaining = Math.max(0, Math.round(avgTimePerFrame * (15 - framesProcessed)));
-
-    countdownEl.textContent = `Geschätzte Restzeit: ${estimatedRemaining}s`;
-}, 1000);
 </script>
 
 </body>
